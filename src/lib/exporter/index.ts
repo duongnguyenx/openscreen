@@ -3,6 +3,7 @@ export { calculateOutputDimensions, GifExporter } from "./gifExporter";
 export { VideoMuxer } from "./muxer";
 export { StreamingVideoDecoder } from "./streamingDecoder";
 export type {
+	AudioEnhanceConfig,
 	ExportConfig,
 	ExportFormat,
 	ExportProgress,
@@ -15,6 +16,7 @@ export type {
 	VideoFrameData,
 } from "./types";
 export {
+	DEFAULT_AUDIO_ENHANCE_CONFIG,
 	GIF_FRAME_RATES,
 	GIF_SIZE_PRESETS,
 	isValidGifFrameRate,

@@ -1,9 +1,12 @@
 import type { Range, Span } from "dnd-timeline";
 import { useTimelineContext } from "dnd-timeline";
 import {
+	AudioLines,
+	Captions,
 	Check,
 	ChevronDown,
 	Gauge,
+	Loader2,
 	MessageSquare,
 	Plus,
 	Scissors,
@@ -20,9 +23,29 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { useScopedT } from "@/contexts/I18nContext";
 import { useShortcuts } from "@/contexts/ShortcutsContext";
+import type {
+	CaptionLanguage,
+	CaptionPosition,
+	CaptionStyle,
+	GenerateCaptionsOptions,
+	GenerateCaptionsProgress,
+} from "@/lib/captions";
+import { DEFAULT_CAPTION_OPTIONS } from "@/lib/captions";
 import { matchesShortcut } from "@/lib/shortcuts";
+import {
+	DEFAULT_SILENCE_OPTIONS,
+	MAX_PADDING_MS,
+	MAX_SILENCE_DURATION_MS,
+	MAX_THRESHOLD_DB,
+	MIN_PADDING_MS,
+	MIN_SILENCE_DURATION_MS,
+	MIN_THRESHOLD_DB,
+	type SilenceDetectionOptions,
+} from "@/lib/silenceDetector";
 import { cn } from "@/lib/utils";
 import { ASPECT_RATIOS, type AspectRatio, getAspectRatioLabel } from "@/utils/aspectRatioUtils";
 import { formatShortcut } from "@/utils/platformUtils";
@@ -68,6 +91,8 @@ interface TimelineEditorProps {
 	onTrimDelete?: (id: string) => void;
 	selectedTrimId?: string | null;
 	onSelectTrim?: (id: string | null) => void;
+	onAutoTrimSilences?: (options: SilenceDetectionOptions) => Promise<void> | void;
+	autoTrimRunning?: boolean;
 	annotationRegions?: AnnotationRegion[];
 	onAnnotationAdded?: (span: Span) => void;
 	onAnnotationSpanChange?: (id: string, span: Span) => void;
@@ -88,6 +113,9 @@ interface TimelineEditorProps {
 	onSelectSpeed?: (id: string | null) => void;
 	aspectRatio: AspectRatio;
 	onAspectRatioChange: (aspectRatio: AspectRatio) => void;
+	onGenerateCaptions?: (options: GenerateCaptionsOptions) => Promise<void> | void;
+	captionsRunning?: boolean;
+	captionsProgress?: GenerateCaptionsProgress | null;
 }
 
 interface TimelineScaleConfig {
@@ -781,6 +809,8 @@ export default function TimelineEditor({
 	onTrimDelete,
 	selectedTrimId,
 	onSelectTrim,
+	onAutoTrimSilences,
+	autoTrimRunning = false,
 	annotationRegions = [],
 	onAnnotationAdded,
 	onAnnotationSpanChange,
@@ -801,6 +831,9 @@ export default function TimelineEditor({
 	onSelectSpeed,
 	aspectRatio,
 	onAspectRatioChange,
+	onGenerateCaptions,
+	captionsRunning = false,
+	captionsProgress,
 }: TimelineEditorProps) {
 	const t = useScopedT("timeline");
 	const totalMs = useMemo(() => Math.max(0, Math.round(videoDuration * 1000)), [videoDuration]);
@@ -1475,6 +1508,21 @@ export default function TimelineEditor({
 					>
 						<Scissors className="w-4 h-4" />
 					</Button>
+					{onAutoTrimSilences && (
+						<AutoTrimSilencesButton
+							onRun={onAutoTrimSilences}
+							running={autoTrimRunning}
+							disabled={!videoDuration}
+						/>
+					)}
+					{onGenerateCaptions && (
+						<AutoCaptionsButton
+							onRun={onGenerateCaptions}
+							running={captionsRunning}
+							progress={captionsProgress ?? null}
+							disabled={!videoDuration}
+						/>
+					)}
 					<Button
 						onClick={handleAddAnnotation}
 						variant="ghost"
@@ -1601,5 +1649,328 @@ export default function TimelineEditor({
 				</TimelineWrapper>
 			</div>
 		</div>
+	);
+}
+
+function AutoTrimSilencesButton({
+	onRun,
+	running,
+	disabled,
+}: {
+	onRun: (options: SilenceDetectionOptions) => Promise<void> | void;
+	running: boolean;
+	disabled: boolean;
+}) {
+	const ts = useScopedT("settings");
+	const [open, setOpen] = useState(false);
+	const [thresholdDb, setThresholdDb] = useState(DEFAULT_SILENCE_OPTIONS.thresholdDb);
+	const [minSilenceMs, setMinSilenceMs] = useState(DEFAULT_SILENCE_OPTIONS.minSilenceMs);
+	const [paddingMs, setPaddingMs] = useState(DEFAULT_SILENCE_OPTIONS.paddingMs);
+
+	const handleApply = useCallback(async () => {
+		await onRun({ thresholdDb, minSilenceMs, paddingMs });
+		setOpen(false);
+	}, [onRun, thresholdDb, minSilenceMs, paddingMs]);
+
+	const triggerDisabled = disabled || running;
+
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					disabled={triggerDisabled}
+					className={cn(
+						"h-7 w-7 text-slate-400 hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all",
+						triggerDisabled && "opacity-40 cursor-not-allowed",
+					)}
+					title={ts("autoTrim.button")}
+				>
+					{running ? (
+						<Loader2 className="w-4 h-4 animate-spin" />
+					) : (
+						<AudioLines className="w-4 h-4" />
+					)}
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent side="bottom" align="start" className="w-80 bg-[#0d0d10] border-white/10 p-4">
+				<div className="mb-3">
+					<div className="text-xs font-medium text-slate-200">{ts("autoTrim.title")}</div>
+					<p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+						{ts("autoTrim.description")}
+					</p>
+				</div>
+
+				<div className="space-y-3">
+					<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+						<div className="flex items-center justify-between mb-1">
+							<span className="text-[10px] font-medium text-slate-300">
+								{ts("autoTrim.threshold")}
+							</span>
+							<span className="text-[10px] text-slate-500 font-mono">{thresholdDb} dB</span>
+						</div>
+						<Slider
+							value={[thresholdDb]}
+							onValueChange={(v) => setThresholdDb(v[0])}
+							min={MIN_THRESHOLD_DB}
+							max={MAX_THRESHOLD_DB}
+							step={1}
+							disabled={running}
+						/>
+						<p className="text-[9px] text-slate-600 mt-1">{ts("autoTrim.thresholdHint")}</p>
+					</div>
+
+					<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+						<div className="flex items-center justify-between mb-1">
+							<span className="text-[10px] font-medium text-slate-300">
+								{ts("autoTrim.minDuration")}
+							</span>
+							<span className="text-[10px] text-slate-500 font-mono">{minSilenceMs} ms</span>
+						</div>
+						<Slider
+							value={[minSilenceMs]}
+							onValueChange={(v) => setMinSilenceMs(v[0])}
+							min={MIN_SILENCE_DURATION_MS}
+							max={MAX_SILENCE_DURATION_MS}
+							step={50}
+							disabled={running}
+						/>
+					</div>
+
+					<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+						<div className="flex items-center justify-between mb-1">
+							<span className="text-[10px] font-medium text-slate-300">
+								{ts("autoTrim.padding")}
+							</span>
+							<span className="text-[10px] text-slate-500 font-mono">{paddingMs} ms</span>
+						</div>
+						<Slider
+							value={[paddingMs]}
+							onValueChange={(v) => setPaddingMs(v[0])}
+							min={MIN_PADDING_MS}
+							max={MAX_PADDING_MS}
+							step={10}
+							disabled={running}
+						/>
+						<p className="text-[9px] text-slate-600 mt-1">{ts("autoTrim.paddingHint")}</p>
+					</div>
+				</div>
+
+				<div className="mt-4 flex gap-2">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="flex-1 h-8 text-xs bg-white/5 border-white/10 hover:bg-white/10"
+						onClick={() => {
+							setThresholdDb(DEFAULT_SILENCE_OPTIONS.thresholdDb);
+							setMinSilenceMs(DEFAULT_SILENCE_OPTIONS.minSilenceMs);
+							setPaddingMs(DEFAULT_SILENCE_OPTIONS.paddingMs);
+						}}
+						disabled={running}
+					>
+						{ts("autoTrim.reset")}
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						className="flex-1 h-8 text-xs bg-[#34B27B] hover:bg-[#34B27B]/90 text-white"
+						onClick={handleApply}
+						disabled={running}
+					>
+						{running ? (
+							<>
+								<Loader2 className="w-3 h-3 animate-spin mr-1" />
+								{ts("autoTrim.running")}
+							</>
+						) : (
+							ts("autoTrim.apply")
+						)}
+					</Button>
+				</div>
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+function AutoCaptionsButton({
+	onRun,
+	running,
+	progress,
+	disabled,
+}: {
+	onRun: (options: GenerateCaptionsOptions) => Promise<void> | void;
+	running: boolean;
+	progress: GenerateCaptionsProgress | null;
+	disabled: boolean;
+}) {
+	const ts = useScopedT("settings");
+	const [open, setOpen] = useState(false);
+	const [language, setLanguage] = useState<CaptionLanguage>(DEFAULT_CAPTION_OPTIONS.language);
+	const [style, setStyle] = useState<CaptionStyle>(DEFAULT_CAPTION_OPTIONS.style);
+	const [position, setPosition] = useState<CaptionPosition>(DEFAULT_CAPTION_OPTIONS.position);
+
+	const handleApply = useCallback(async () => {
+		await onRun({ language, style, position });
+		setOpen(false);
+	}, [onRun, language, style, position]);
+
+	const triggerDisabled = disabled || running;
+
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon"
+					disabled={triggerDisabled}
+					className={cn(
+						"h-7 w-7 text-slate-400 hover:text-[#a78bfa] hover:bg-[#a78bfa]/10 transition-all",
+						triggerDisabled && "opacity-40 cursor-not-allowed",
+					)}
+					title={ts("captions.button")}
+				>
+					{running ? (
+						<Loader2 className="w-4 h-4 animate-spin" />
+					) : (
+						<Captions className="w-4 h-4" />
+					)}
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent side="bottom" align="start" className="w-80 bg-[#0d0d10] border-white/10 p-4">
+				<div className="mb-3">
+					<div className="text-xs font-medium text-slate-200">{ts("captions.title")}</div>
+					<p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+						{ts("captions.description")}
+					</p>
+				</div>
+
+				<div className="space-y-3">
+					<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+						<div className="text-[10px] font-medium text-slate-300 mb-1.5">
+							{ts("captions.language")}
+						</div>
+						<div className="grid grid-cols-2 gap-1.5">
+							{(["en", "multilingual"] as const).map((lang) => {
+								const isActive = language === lang;
+								return (
+									<Button
+										key={lang}
+										type="button"
+										onClick={() => setLanguage(lang)}
+										disabled={running}
+										className={cn(
+											"h-auto w-full rounded-lg border px-1 py-1.5 text-center transition-all",
+											"duration-200 ease-out cursor-pointer",
+											isActive
+												? "border-[#a78bfa] bg-[#a78bfa] text-white"
+												: "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200",
+										)}
+									>
+										<span className="text-[10px] font-semibold">{ts(`captions.lang.${lang}`)}</span>
+									</Button>
+								);
+							})}
+						</div>
+					</div>
+
+					<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+						<div className="text-[10px] font-medium text-slate-300 mb-1.5">
+							{ts("captions.style")}
+						</div>
+						<div className="grid grid-cols-3 gap-1.5">
+							{(["tiktok", "youtube", "subtle"] as const).map((s) => {
+								const isActive = style === s;
+								return (
+									<Button
+										key={s}
+										type="button"
+										onClick={() => setStyle(s)}
+										disabled={running}
+										className={cn(
+											"h-auto w-full rounded-lg border px-1 py-1.5 text-center transition-all",
+											"duration-200 ease-out cursor-pointer",
+											isActive
+												? "border-[#a78bfa] bg-[#a78bfa] text-white"
+												: "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200",
+										)}
+									>
+										<span className="text-[10px] font-semibold capitalize">
+											{ts(`captions.styles.${s}`)}
+										</span>
+									</Button>
+								);
+							})}
+						</div>
+					</div>
+
+					<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+						<div className="text-[10px] font-medium text-slate-300 mb-1.5">
+							{ts("captions.position")}
+						</div>
+						<div className="grid grid-cols-3 gap-1.5">
+							{(["top", "center", "bottom"] as const).map((p) => {
+								const isActive = position === p;
+								return (
+									<Button
+										key={p}
+										type="button"
+										onClick={() => setPosition(p)}
+										disabled={running}
+										className={cn(
+											"h-auto w-full rounded-lg border px-1 py-1.5 text-center transition-all",
+											"duration-200 ease-out cursor-pointer",
+											isActive
+												? "border-[#a78bfa] bg-[#a78bfa] text-white"
+												: "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200",
+										)}
+									>
+										<span className="text-[10px] font-semibold capitalize">
+											{ts(`captions.positions.${p}`)}
+										</span>
+									</Button>
+								);
+							})}
+						</div>
+					</div>
+
+					{running && progress && (
+						<div className="p-2 rounded-lg bg-[#a78bfa]/10 border border-[#a78bfa]/20">
+							<div className="flex items-center gap-1.5 text-[10px] text-[#a78bfa]">
+								<Loader2 className="w-3 h-3 animate-spin" />
+								<span>
+									{ts(`captions.phase.${progress.phase}`)}
+									{progress.percent >= 0 && ` ${Math.round(progress.percent * 100)}%`}
+								</span>
+							</div>
+						</div>
+					)}
+
+					<p className="text-[9px] text-slate-600 leading-tight">{ts("captions.firstLoadHint")}</p>
+				</div>
+
+				<div className="mt-4">
+					<Button
+						type="button"
+						size="sm"
+						className="w-full h-8 text-xs bg-[#a78bfa] hover:bg-[#a78bfa]/90 text-white"
+						onClick={handleApply}
+						disabled={running}
+					>
+						{running ? (
+							<>
+								<Loader2 className="w-3 h-3 animate-spin mr-1" />
+								{ts("captions.generating")}
+							</>
+						) : (
+							ts("captions.generate")
+						)}
+					</Button>
+				</div>
+			</PopoverContent>
+		</Popover>
 	);
 }

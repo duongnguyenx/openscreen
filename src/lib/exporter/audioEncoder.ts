@@ -1,6 +1,12 @@
 import { WebDemuxer } from "web-demuxer";
 import type { SpeedRegion, TrimRegion } from "@/components/video-editor/types";
+import {
+	audioBufferToDataFrames,
+	audioDataFramesToBuffer,
+	enhanceAudio,
+} from "@/lib/audioEnhancer";
 import type { VideoMuxer } from "./muxer";
+import type { AudioEnhanceConfig } from "./types";
 
 const AUDIO_BITRATE = 128_000;
 const DECODE_BACKPRESSURE_LIMIT = 20;
@@ -22,6 +28,7 @@ export class AudioProcessor {
 		trimRegions: TrimRegion[] | undefined,
 		speedRegions: SpeedRegion[] | undefined,
 		validatedDurationSec: number,
+		audioEnhance?: AudioEnhanceConfig,
 	): Promise<void> {
 		const sortedTrims = trimRegions ? [...trimRegions].sort((a, b) => a.startMs - b.startMs) : [];
 		const sortedSpeedRegions = speedRegions
@@ -39,7 +46,7 @@ export class AudioProcessor {
 				validatedDurationSec,
 			);
 			if (!this.cancelled && renderedAudioBlob.size > 0) {
-				await this.muxRenderedAudioBlob(renderedAudioBlob, muxer);
+				await this.muxRenderedAudioBlob(renderedAudioBlob, muxer, audioEnhance);
 				return;
 			}
 			return;
@@ -49,7 +56,7 @@ export class AudioProcessor {
 		// The +0.5s buffer mirrors streamingDecoder.decodeAll's read window so the trim-only
 		// and speed-aware paths agree on how far to read past the validated duration boundary.
 		const readEndSec = validatedDurationSec + 0.5;
-		await this.processTrimOnlyAudio(demuxer, muxer, sortedTrims, readEndSec);
+		await this.processTrimOnlyAudio(demuxer, muxer, sortedTrims, readEndSec, audioEnhance);
 	}
 
 	// Legacy trim-only path. This is still used for projects without speed regions.
@@ -58,6 +65,7 @@ export class AudioProcessor {
 		muxer: VideoMuxer,
 		sortedTrims: TrimRegion[],
 		readEndSec?: number,
+		audioEnhance?: AudioEnhanceConfig,
 	): Promise<void> {
 		let audioConfig: AudioDecoderConfig;
 		try {
@@ -124,6 +132,10 @@ export class AudioProcessor {
 			return;
 		}
 
+		// Phase 1.5 (optional): run the decoded frames through the audio enhancer
+		// (denoise + loudness normalization) before re-encoding.
+		const framesToEncode = await this.applyEnhancement(decodedFrames, audioEnhance);
+
 		// Phase 2: Re-encode with timestamps adjusted for trim gaps
 		const encodedChunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[] = [];
 
@@ -147,13 +159,13 @@ export class AudioProcessor {
 		const encodeSupport = await AudioEncoder.isConfigSupported(encodeConfig);
 		if (!encodeSupport.supported) {
 			console.warn("[AudioProcessor] Opus encoding not supported, skipping audio");
-			for (const frame of decodedFrames) frame.close();
+			for (const frame of framesToEncode) frame.close();
 			return;
 		}
 
 		encoder.configure(encodeConfig);
 
-		for (const audioData of decodedFrames) {
+		for (const audioData of framesToEncode) {
 			if (this.cancelled) {
 				audioData.close();
 				continue;
@@ -388,8 +400,19 @@ export class AudioProcessor {
 	}
 
 	// Demuxes the rendered speed-adjusted blob and feeds encoded chunks into the MP4 muxer.
-	private async muxRenderedAudioBlob(blob: Blob, muxer: VideoMuxer): Promise<void> {
+	// When `audioEnhance.enabled`, the blob is fully decoded → enhanced → re-encoded
+	// instead of pass-through demux.
+	private async muxRenderedAudioBlob(
+		blob: Blob,
+		muxer: VideoMuxer,
+		audioEnhance?: AudioEnhanceConfig,
+	): Promise<void> {
 		if (this.cancelled) return;
+
+		if (audioEnhance?.enabled) {
+			await this.muxEnhancedRenderedAudio(blob, muxer, audioEnhance);
+			return;
+		}
 
 		const file = new File([blob], "speed-audio.webm", { type: blob.type || "audio/webm" });
 		const wasmUrl = new URL("./wasm/web-demuxer.wasm", window.location.href).href;
@@ -425,6 +448,110 @@ export class AudioProcessor {
 			} catch {
 				/* ignore */
 			}
+		}
+	}
+
+	private async muxEnhancedRenderedAudio(
+		blob: Blob,
+		muxer: VideoMuxer,
+		audioEnhance: AudioEnhanceConfig,
+	): Promise<void> {
+		const ctx = new AudioContext();
+		try {
+			const arrayBuffer = await blob.arrayBuffer();
+			const buffer = await ctx.decodeAudioData(arrayBuffer);
+			const enhanced = await enhanceAudio(buffer, audioEnhance);
+			await this.encodeAudioBufferToMuxer(enhanced, muxer);
+		} finally {
+			void ctx.close();
+		}
+	}
+
+	private async encodeAudioBufferToMuxer(buffer: AudioBuffer, muxer: VideoMuxer): Promise<void> {
+		const sampleRate = buffer.sampleRate;
+		const channels = buffer.numberOfChannels;
+
+		const encodeConfig: AudioEncoderConfig = {
+			codec: "opus",
+			sampleRate,
+			numberOfChannels: channels,
+			bitrate: AUDIO_BITRATE,
+		};
+		const support = await AudioEncoder.isConfigSupported(encodeConfig);
+		if (!support.supported) {
+			console.warn("[AudioProcessor] Opus encoding not supported for enhanced audio");
+			return;
+		}
+
+		const encodedChunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[] = [];
+		const encoder = new AudioEncoder({
+			output: (chunk, meta) => encodedChunks.push({ chunk, meta }),
+			error: (e) => console.error("[AudioProcessor] Encode error:", e),
+		});
+		encoder.configure(encodeConfig);
+
+		// Feed AudioBuffer to encoder in fixed-size chunks (Opus frame size aligned).
+		const FRAME_SIZE = 960; // 20ms @ 48kHz, standard Opus frame
+		const total = buffer.length;
+
+		for (let offset = 0; offset < total; offset += FRAME_SIZE) {
+			if (this.cancelled) break;
+			const frameLen = Math.min(FRAME_SIZE, total - offset);
+			const planar = new Float32Array(channels * frameLen);
+			for (let c = 0; c < channels; c++) {
+				const src = buffer.getChannelData(c).subarray(offset, offset + frameLen);
+				planar.set(src, c * frameLen);
+			}
+			const ts = Math.round((offset / sampleRate) * 1_000_000);
+			const audioData = new AudioData({
+				format: "f32-planar",
+				sampleRate,
+				numberOfFrames: frameLen,
+				numberOfChannels: channels,
+				timestamp: ts,
+				data: planar,
+			});
+			encoder.encode(audioData);
+			audioData.close();
+		}
+
+		if (encoder.state === "configured") {
+			await encoder.flush();
+			encoder.close();
+		}
+
+		for (const { chunk, meta } of encodedChunks) {
+			if (this.cancelled) break;
+			await muxer.addAudioChunk(chunk, meta);
+		}
+	}
+
+	/**
+	 * Run decoded AudioData frames through `enhanceAudio` and return a new array
+	 * of AudioData frames matching the original chunk shape (so re-encode logic
+	 * doesn't need to special-case the buffer size).
+	 *
+	 * Returns the input frames unchanged when enhancement is disabled or fails.
+	 */
+	private async applyEnhancement(
+		frames: AudioData[],
+		audioEnhance: AudioEnhanceConfig | undefined,
+	): Promise<AudioData[]> {
+		if (!audioEnhance?.enabled || frames.length === 0) return frames;
+
+		try {
+			const buffer = audioDataFramesToBuffer(frames);
+			if (!buffer) return frames;
+
+			const enhanced = await enhanceAudio(buffer, audioEnhance);
+			const enhancedFrames = audioBufferToDataFrames(enhanced, frames);
+
+			// Replace original frames with enhanced ones; close originals to free GPU buffers.
+			for (const frame of frames) frame.close();
+			return enhancedFrames;
+		} catch (err) {
+			console.warn("[AudioProcessor] Audio enhancement failed, falling back to raw:", err);
+			return frames;
 		}
 	}
 

@@ -14,7 +14,7 @@ import { AudioProcessor } from "./audioEncoder";
 import { FrameRenderer } from "./frameRenderer";
 import { VideoMuxer } from "./muxer";
 import { StreamingVideoDecoder } from "./streamingDecoder";
-import type { ExportConfig, ExportProgress, ExportResult } from "./types";
+import type { AudioEnhanceConfig, ExportConfig, ExportProgress, ExportResult } from "./types";
 
 const ENCODER_STALL_TIMEOUT_MS = 15_000;
 const ENCODER_FLUSH_TIMEOUT_MS = 20_000;
@@ -44,6 +44,7 @@ interface VideoExporterConfig extends ExportConfig {
 	cursorTelemetry?: import("@/components/video-editor/types").CursorTelemetryPoint[];
 	cursorHighlight?: import("@/components/video-editor/videoPlayback/cursorHighlight").CursorHighlightConfig;
 	cursorClickTimestamps?: number[];
+	audioEnhance?: AudioEnhanceConfig;
 	onProgress?: (progress: ExportProgress) => void;
 }
 
@@ -362,6 +363,7 @@ export class VideoExporter {
 						this.config.trimRegions,
 						this.config.speedRegions,
 						videoInfo.duration,
+						this.config.audioEnhance,
 					);
 				}
 			}

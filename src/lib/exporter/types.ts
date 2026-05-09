@@ -45,12 +45,26 @@ export interface GifExportConfig {
 	height: number;
 }
 
+export interface AudioEnhanceConfig {
+	enabled: boolean;
+	denoise: "off" | "light" | "strong";
+	loudnessTargetLufs: number;
+}
+
+export const DEFAULT_AUDIO_ENHANCE_CONFIG: AudioEnhanceConfig = {
+	enabled: false,
+	denoise: "light",
+	loudnessTargetLufs: -16,
+};
+
 export interface ExportSettings {
 	format: ExportFormat;
 	// MP4 settings
 	quality?: ExportQuality;
 	// GIF settings
 	gifConfig?: GifExportConfig;
+	// Audio enhancement (denoise + loudness normalization)
+	audioEnhance?: AudioEnhanceConfig;
 }
 
 export const GIF_SIZE_PRESETS: Record<GifSizePreset, { maxHeight: number; label: string }> = {

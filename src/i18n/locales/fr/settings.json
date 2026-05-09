@@ -35,6 +35,83 @@
 	"trim": {
 		"deleteRegion": "Supprimer la région de coupe"
 	},
+	"captions": {
+		"button": "Sous-titres auto",
+		"title": "Sous-titres auto",
+		"description": "Génère des sous-titres à partir de l'audio vocal. Entièrement hors ligne ; la première utilisation télécharge un modèle de ~40 Mo (mis en cache).",
+		"language": "Langue",
+		"lang": {
+			"en": "Anglais",
+			"multilingual": "Multilingue"
+		},
+		"style": "Style de sous-titre",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "Discret"
+		},
+		"position": "Position",
+		"positions": {
+			"top": "Haut",
+			"center": "Centre",
+			"bottom": "Bas"
+		},
+		"phase": {
+			"loadingModel": "Chargement du modèle…",
+			"decoding": "Décodage audio…",
+			"resampling": "Rééchantillonnage…",
+			"transcribing": "Transcription…",
+			"building": "Création des sous-titres…"
+		},
+		"firstLoadHint": "Le premier lancement télécharge ~40 Mo. Ensuite c'est instantané.",
+		"generate": "Générer les sous-titres",
+		"generating": "Génération…",
+		"appliedSummary": "{{count}} sous-titres ajoutés",
+		"noneFound": "Aucune voix détectée",
+		"failed": "Échec de la génération. Consultez la console pour plus de détails."
+	},
+	"autoTrim": {
+		"button": "Couper les silences",
+		"title": "Couper les silences automatiquement",
+		"description": "Détecte les sections silencieuses et ajoute automatiquement des régions de coupe. Les coupes existantes sont conservées.",
+		"threshold": "Seuil de silence",
+		"thresholdHint": "Plus bas = plus agressif. Pour les voix off, essayez autour de −40 dB.",
+		"minDuration": "Durée minimale du silence",
+		"padding": "Marge autour du silence",
+		"paddingHint": "Garder un peu d'audio autour de chaque coupe pour ne pas tronquer les mots.",
+		"reset": "Réinitialiser",
+		"apply": "Appliquer",
+		"running": "Détection…",
+		"appliedSummary": "{{count}} régions de coupe ajoutées ({{seconds}} s de silence)",
+		"noneFound": "Aucun silence détecté avec les paramètres actuels",
+		"failed": "Impossible d'analyser l'audio. Essayez un autre enregistrement ou d'autres paramètres."
+	},
+	"audio": {
+		"title": "Audio",
+		"enhanceVoice": "Améliorer la voix",
+		"enhanceDescription": "Débruiter + normaliser le volume à l'export",
+		"noiseReduction": "Réduction du bruit",
+		"denoise": {
+			"off": "Désactivé",
+			"light": "Léger",
+			"strong": "Fort"
+		},
+		"loudnessTarget": "Volume cible",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "Podcast",
+			"soft": "Doux"
+		},
+		"preview": {
+			"title": "Aperçu",
+			"tenSeconds": "10s",
+			"original": "Original",
+			"enhanced": "Amélioré",
+			"tip": "Cliquez les deux pour comparer A/B",
+			"renderFailed": "Impossible de générer l'aperçu",
+			"playbackFailed": "Impossible de lire le fragment"
+		}
+	},
 	"layout": {
 		"title": "Mise en page",
 		"preset": "Préréglage",

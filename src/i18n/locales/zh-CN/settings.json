@@ -28,6 +28,83 @@
 	"trim": {
 		"deleteRegion": "删除剪辑区域"
 	},
+	"captions": {
+		"button": "自动字幕",
+		"title": "自动字幕",
+		"description": "从语音音频生成字幕。完全离线;首次使用会下载约 40MB 模型(已缓存)。",
+		"language": "语言",
+		"lang": {
+			"en": "英语",
+			"multilingual": "多语言"
+		},
+		"style": "字幕样式",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "简洁"
+		},
+		"position": "位置",
+		"positions": {
+			"top": "顶部",
+			"center": "中间",
+			"bottom": "底部"
+		},
+		"phase": {
+			"loadingModel": "加载模型…",
+			"decoding": "解码音频…",
+			"resampling": "重采样…",
+			"transcribing": "转录中…",
+			"building": "生成字幕…"
+		},
+		"firstLoadHint": "首次运行将下载约 40MB,后续运行即时加载。",
+		"generate": "生成字幕",
+		"generating": "生成中…",
+		"appliedSummary": "已添加 {{count}} 条字幕",
+		"noneFound": "未检测到语音",
+		"failed": "字幕生成失败。详情请查看控制台。"
+	},
+	"autoTrim": {
+		"button": "自动修剪静音",
+		"title": "自动修剪静音",
+		"description": "自动检测安静片段并添加剪辑区域。现有剪辑会被保留。",
+		"threshold": "静音阈值",
+		"thresholdHint": "数值越低越激进。仅旁白录制建议 −40 dB 左右。",
+		"minDuration": "最短静音时长",
+		"padding": "静音周围保留",
+		"paddingHint": "在每个剪辑前后保留一点音频,避免单词被切掉。",
+		"reset": "重置",
+		"apply": "应用",
+		"running": "检测中…",
+		"appliedSummary": "已添加 {{count}} 个剪辑区域(共 {{seconds}} 秒静音)",
+		"noneFound": "当前设置下未检测到静音",
+		"failed": "无法分析音频。请尝试其他录制或设置。"
+	},
+	"audio": {
+		"title": "音频",
+		"enhanceVoice": "增强人声",
+		"enhanceDescription": "导出时降噪 + 响度归一化",
+		"noiseReduction": "降噪",
+		"denoise": {
+			"off": "关",
+			"light": "轻度",
+			"strong": "强"
+		},
+		"loudnessTarget": "响度目标",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "播客",
+			"soft": "柔和"
+		},
+		"preview": {
+			"title": "预听",
+			"tenSeconds": "10秒",
+			"original": "原始",
+			"enhanced": "增强后",
+			"tip": "点击两个按钮进行 A/B 对比",
+			"renderFailed": "无法生成预听片段",
+			"playbackFailed": "无法播放片段"
+		}
+	},
 	"layout": {
 		"title": "布局",
 		"preset": "预设",

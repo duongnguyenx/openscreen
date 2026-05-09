@@ -1,4 +1,4 @@
-import type { ExportFormat, ExportQuality } from "@/lib/exporter";
+import type { AudioEnhanceConfig, ExportFormat, ExportQuality } from "@/lib/exporter";
 import type { AspectRatio } from "@/utils/aspectRatioUtils";
 
 const PREFS_KEY = "openscreen_user_preferences";
@@ -14,6 +14,8 @@ const VALID_ASPECT_RATIOS: readonly string[] = [
 	"native",
 ];
 
+const VALID_DENOISE: readonly AudioEnhanceConfig["denoise"][] = ["off", "light", "strong"];
+
 export interface UserPreferences {
 	/** Default padding % */
 	padding: number;
@@ -25,6 +27,8 @@ export interface UserPreferences {
 	exportFormat: ExportFormat;
 	/** Folder used for the most recent successful export, if any */
 	exportFolder: string | null;
+	/** Default audio enhancement settings */
+	audioEnhance: AudioEnhanceConfig;
 }
 
 const DEFAULT_PREFS: UserPreferences = {
@@ -33,6 +37,11 @@ const DEFAULT_PREFS: UserPreferences = {
 	exportQuality: "good",
 	exportFormat: "mp4",
 	exportFolder: null,
+	audioEnhance: {
+		enabled: false,
+		denoise: "light",
+		loudnessTargetLufs: -16,
+	},
 };
 
 function safeJsonParse(text: string | null): Record<string, unknown> | null {
@@ -83,7 +92,26 @@ export function loadUserPreferences(): UserPreferences {
 			typeof raw.exportFolder === "string" && raw.exportFolder.length > 0
 				? raw.exportFolder
 				: DEFAULT_PREFS.exportFolder,
+		audioEnhance: parseAudioEnhance(raw.audioEnhance),
 	};
+}
+
+function parseAudioEnhance(raw: unknown): AudioEnhanceConfig {
+	const fallback = DEFAULT_PREFS.audioEnhance;
+	if (!raw || typeof raw !== "object") return fallback;
+	const r = raw as Record<string, unknown>;
+	const enabled = typeof r.enabled === "boolean" ? r.enabled : fallback.enabled;
+	const denoise = VALID_DENOISE.includes(r.denoise as AudioEnhanceConfig["denoise"])
+		? (r.denoise as AudioEnhanceConfig["denoise"])
+		: fallback.denoise;
+	const target =
+		typeof r.loudnessTargetLufs === "number" &&
+		Number.isFinite(r.loudnessTargetLufs) &&
+		r.loudnessTargetLufs >= -30 &&
+		r.loudnessTargetLufs <= -10
+			? r.loudnessTargetLufs
+			: fallback.loudnessTargetLufs;
+	return { enabled, denoise, loudnessTargetLufs: target };
 }
 
 /**

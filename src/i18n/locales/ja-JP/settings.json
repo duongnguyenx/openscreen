@@ -28,6 +28,83 @@
 	"trim": {
 		"deleteRegion": "トリム範囲を削除"
 	},
+	"captions": {
+		"button": "自動字幕",
+		"title": "自動字幕",
+		"description": "音声から字幕を生成します。完全オフライン。初回は約40MBのモデルをダウンロード(キャッシュされます)。",
+		"language": "言語",
+		"lang": {
+			"en": "英語",
+			"multilingual": "多言語"
+		},
+		"style": "字幕スタイル",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "シンプル"
+		},
+		"position": "位置",
+		"positions": {
+			"top": "上",
+			"center": "中央",
+			"bottom": "下"
+		},
+		"phase": {
+			"loadingModel": "モデル読み込み中…",
+			"decoding": "音声デコード中…",
+			"resampling": "リサンプリング中…",
+			"transcribing": "文字起こし中…",
+			"building": "字幕生成中…"
+		},
+		"firstLoadHint": "初回は約40MBダウンロード、以降は即時。",
+		"generate": "字幕を生成",
+		"generating": "生成中…",
+		"appliedSummary": "{{count}} 個の字幕を追加しました",
+		"noneFound": "音声が検出されませんでした",
+		"failed": "字幕生成に失敗しました。詳細はコンソールをご確認ください。"
+	},
+	"autoTrim": {
+		"button": "無音を自動トリム",
+		"title": "無音を自動トリム",
+		"description": "静かな部分を検出して自動的にトリム範囲を追加します。既存のトリムはそのまま残ります。",
+		"threshold": "無音しきい値",
+		"thresholdHint": "低いほど積極的にカットします。ナレーション録画は −40 dB 付近が目安です。",
+		"minDuration": "最小無音時間",
+		"padding": "無音の前後に残す時間",
+		"paddingHint": "単語が切れないよう、各カットの前後に少し音声を残します。",
+		"reset": "リセット",
+		"apply": "適用",
+		"running": "検出中…",
+		"appliedSummary": "{{count}} 個のトリム範囲を追加しました(無音 {{seconds}} 秒)",
+		"noneFound": "現在の設定では無音を検出できませんでした",
+		"failed": "音声を解析できませんでした。別の録画または設定をお試しください。"
+	},
+	"audio": {
+		"title": "オーディオ",
+		"enhanceVoice": "音声を強化",
+		"enhanceDescription": "エクスポート時にノイズ除去 + ラウドネス正規化",
+		"noiseReduction": "ノイズ除去",
+		"denoise": {
+			"off": "オフ",
+			"light": "軽め",
+			"strong": "強め"
+		},
+		"loudnessTarget": "ラウドネス目標",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "ポッドキャスト",
+			"soft": "ソフト"
+		},
+		"preview": {
+			"title": "プレビュー",
+			"tenSeconds": "10秒",
+			"original": "オリジナル",
+			"enhanced": "強化後",
+			"tip": "両方をクリックして A/B 比較",
+			"renderFailed": "プレビューを生成できませんでした",
+			"playbackFailed": "再生できませんでした"
+		}
+	},
 	"layout": {
 		"title": "レイアウト",
 		"preset": "プリセット",

@@ -16,8 +16,12 @@ import { useShortcuts } from "@/contexts/ShortcutsContext";
 import { INITIAL_EDITOR_STATE, useEditorHistory } from "@/hooks/useEditorHistory";
 import { type Locale } from "@/i18n/config";
 import { getAvailableLocales, getLocaleName } from "@/i18n/loader";
+import type { GenerateCaptionsOptions, GenerateCaptionsProgress } from "@/lib/captions";
+import { generateCaptions } from "@/lib/captions";
 import {
+	type AudioEnhanceConfig,
 	calculateOutputDimensions,
+	DEFAULT_AUDIO_ENHANCE_CONFIG,
 	type ExportFormat,
 	type ExportProgress,
 	type ExportQuality,
@@ -31,6 +35,12 @@ import {
 import { computeFrameStepTime } from "@/lib/frameStep";
 import type { ProjectMedia } from "@/lib/recordingSession";
 import { matchesShortcut } from "@/lib/shortcuts";
+import {
+	clampSilenceOptions,
+	decodeAudioFromUrl,
+	detectSilences,
+	type SilenceDetectionOptions,
+} from "@/lib/silenceDetector";
 import {
 	getExportFolder,
 	loadUserPreferences,
@@ -145,6 +155,9 @@ export default function VideoEditor() {
 	const [gifFrameRate, setGifFrameRate] = useState<GifFrameRate>(15);
 	const [gifLoop, setGifLoop] = useState(true);
 	const [gifSizePreset, setGifSizePreset] = useState<GifSizePreset>("medium");
+	const [audioEnhance, setAudioEnhance] = useState<AudioEnhanceConfig>(
+		DEFAULT_AUDIO_ENHANCE_CONFIG,
+	);
 	const [exportedFilePath, setExportedFilePath] = useState<string | null>(null);
 	const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
 	const [unsavedExport, setUnsavedExport] = useState<{
@@ -425,14 +438,21 @@ export default function VideoEditor() {
 		});
 		setExportQuality(prefs.exportQuality);
 		setExportFormat(prefs.exportFormat);
+		setAudioEnhance(prefs.audioEnhance);
 		setPrefsHydrated(true);
 	}, [updateState]);
 
 	// Auto-save user preferences when settings change
 	useEffect(() => {
 		if (!prefsHydrated) return;
-		saveUserPreferences({ padding, aspectRatio, exportQuality, exportFormat });
-	}, [prefsHydrated, padding, aspectRatio, exportQuality, exportFormat]);
+		saveUserPreferences({
+			padding,
+			aspectRatio,
+			exportQuality,
+			exportFormat,
+			audioEnhance,
+		});
+	}, [prefsHydrated, padding, aspectRatio, exportQuality, exportFormat, audioEnhance]);
 
 	const saveProject = useCallback(
 		async (forceSaveAs: boolean) => {
@@ -894,6 +914,116 @@ export default function VideoEditor() {
 			}
 		},
 		[selectedTrimId, pushState],
+	);
+
+	const [autoTrimRunning, setAutoTrimRunning] = useState(false);
+
+	const handleAutoTrimSilences = useCallback(
+		async (options: SilenceDetectionOptions) => {
+			const sourceUrl = videoSourcePath ? toFileUrl(videoSourcePath) : videoPath;
+			if (!sourceUrl) {
+				toast.error(t("errors.noVideoLoaded"));
+				return;
+			}
+
+			setAutoTrimRunning(true);
+			try {
+				const buffer = await decodeAudioFromUrl(sourceUrl);
+				const result = detectSilences(buffer, clampSilenceOptions(options));
+
+				if (result.ranges.length === 0) {
+					toast.info(ts("autoTrim.noneFound"));
+					return;
+				}
+
+				const newRegions: TrimRegion[] = result.ranges.map((range) => ({
+					id: `trim-${nextTrimIdRef.current++}`,
+					startMs: range.startMs,
+					endMs: range.endMs,
+				}));
+
+				pushState((prev) => ({
+					trimRegions: [...prev.trimRegions, ...newRegions],
+				}));
+				setSelectedTrimId(null);
+				toast.success(
+					ts("autoTrim.appliedSummary", {
+						count: newRegions.length,
+						seconds: (result.totalSilenceMs / 1000).toFixed(1),
+					}),
+				);
+			} catch (err) {
+				console.error("Auto-trim failed:", err);
+				toast.error(ts("autoTrim.failed"));
+			} finally {
+				setAutoTrimRunning(false);
+			}
+		},
+		[videoPath, videoSourcePath, pushState, t, ts],
+	);
+
+	const [captionsRunning, setCaptionsRunning] = useState(false);
+	const [captionsProgress, setCaptionsProgress] = useState<GenerateCaptionsProgress | null>(null);
+
+	const handleGenerateCaptions = useCallback(
+		async (options: GenerateCaptionsOptions) => {
+			const sourceUrl = videoSourcePath ? toFileUrl(videoSourcePath) : videoPath;
+			if (!sourceUrl) {
+				toast.error(t("errors.noVideoLoaded"));
+				return;
+			}
+
+			setCaptionsRunning(true);
+			setCaptionsProgress({ phase: "loadingModel", percent: -1 });
+
+			try {
+				const result = await generateCaptions(sourceUrl, options, (p) => {
+					setCaptionsProgress(p);
+				});
+
+				if (result.captions.length === 0) {
+					toast.info(ts("captions.noneFound"));
+					return;
+				}
+
+				const maxExistingZ = annotationRegions.reduce((acc, r) => Math.max(acc, r.zIndex ?? 0), 0);
+				let z = maxExistingZ + 1;
+				const captionsWithZ = result.captions.map((c) => ({ ...c, zIndex: z++ }));
+				nextAnnotationZIndexRef.current = z;
+
+				pushState((prev) => ({
+					annotationRegions: [...prev.annotationRegions, ...captionsWithZ],
+				}));
+
+				// Jump the playhead to the first caption + select it so the user sees a
+				// caption render immediately. Without this, captions would only appear
+				// once `currentTime` happens to overlap a caption window.
+				const firstCaption = captionsWithZ[0];
+				if (firstCaption) {
+					handleSeek(firstCaption.startMs / 1000);
+					setSelectedAnnotationId(firstCaption.id);
+					setSelectedZoomId(null);
+					setSelectedTrimId(null);
+					setSelectedBlurId(null);
+					setSelectedSpeedId(null);
+				}
+
+				toast.success(
+					ts("captions.appliedSummary", {
+						count: result.captions.length,
+					}),
+				);
+			} catch (err) {
+				console.error("Caption generation failed:", err);
+				if ((err as Error)?.message !== "aborted") {
+					toast.error(ts("captions.failed"));
+				}
+			} finally {
+				setCaptionsRunning(false);
+				setCaptionsProgress(null);
+			}
+		},
+		[videoPath, videoSourcePath, pushState, annotationRegions, t, ts],
 	);
 
 	const handleSelectSpeed = useCallback((id: string | null) => {
@@ -1607,6 +1737,7 @@ export default function VideoEditor() {
 						cursorTelemetry,
 						cursorClickTimestamps,
 						cursorHighlight: effectiveCursorHighlight,
+						audioEnhance,
 						onProgress: (progress: ExportProgress) => {
 							setExportProgress(progress);
 						},
@@ -1696,6 +1827,7 @@ export default function VideoEditor() {
 			cursorTelemetry,
 			cursorClickTimestamps,
 			effectiveCursorHighlight,
+			audioEnhance,
 			t,
 		],
 	);
@@ -2013,6 +2145,8 @@ export default function VideoEditor() {
 									onTrimDelete={handleTrimDelete}
 									selectedTrimId={selectedTrimId}
 									onSelectTrim={handleSelectTrim}
+									onAutoTrimSilences={handleAutoTrimSilences}
+									autoTrimRunning={autoTrimRunning}
 									speedRegions={speedRegions}
 									onSpeedAdded={handleSpeedAdded}
 									onSpeedSpanChange={handleSpeedSpanChange}
@@ -2042,6 +2176,9 @@ export default function VideoEditor() {
 													: webcamLayoutPreset,
 										})
 									}
+									onGenerateCaptions={handleGenerateCaptions}
+									captionsRunning={captionsRunning}
+									captionsProgress={captionsProgress}
 								/>
 							</div>
 						</Panel>
@@ -2153,6 +2290,10 @@ export default function VideoEditor() {
 						}
 						onSpeedChange={handleSpeedChange}
 						onSpeedDelete={handleSpeedDelete}
+						audioEnhance={audioEnhance}
+						onAudioEnhanceChange={setAudioEnhance}
+						audioPreviewUrl={videoPath}
+						audioPreviewCurrentTimeMs={Math.round(currentTime * 1000)}
 						unsavedExport={unsavedExport}
 						onSaveUnsavedExport={handleSaveUnsavedExport}
 						onSaveDiagnostic={handleSaveDiagnostic}

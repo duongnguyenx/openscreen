@@ -28,6 +28,83 @@
 	"trim": {
 		"deleteRegion": "트림 구간 삭제"
 	},
+	"captions": {
+		"button": "자동 자막",
+		"title": "자동 자막",
+		"description": "음성 오디오에서 자막을 생성합니다. 완전 오프라인; 첫 사용 시 약 40MB 모델 다운로드(캐시됨).",
+		"language": "언어",
+		"lang": {
+			"en": "영어",
+			"multilingual": "다국어"
+		},
+		"style": "자막 스타일",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "심플"
+		},
+		"position": "위치",
+		"positions": {
+			"top": "상단",
+			"center": "중앙",
+			"bottom": "하단"
+		},
+		"phase": {
+			"loadingModel": "모델 로딩 중…",
+			"decoding": "오디오 디코딩 중…",
+			"resampling": "리샘플링 중…",
+			"transcribing": "전사 중…",
+			"building": "자막 생성 중…"
+		},
+		"firstLoadHint": "처음 실행 시 약 40MB 다운로드. 이후 즉시 로딩됩니다.",
+		"generate": "자막 생성",
+		"generating": "생성 중…",
+		"appliedSummary": "자막 {{count}}개 추가됨",
+		"noneFound": "음성이 감지되지 않았습니다",
+		"failed": "자막 생성 실패. 자세한 내용은 콘솔을 확인하세요."
+	},
+	"autoTrim": {
+		"button": "무음 자동 트리밍",
+		"title": "무음 자동 트리밍",
+		"description": "조용한 구간을 감지하여 자동으로 트림 구간을 추가합니다. 기존 트림은 유지됩니다.",
+		"threshold": "무음 임계값",
+		"thresholdHint": "낮을수록 더 적극적입니다. 보이스오버 녹화는 −40 dB 정도가 적당합니다.",
+		"minDuration": "최소 무음 길이",
+		"padding": "무음 주변 여백",
+		"paddingHint": "단어가 잘리지 않도록 각 컷 주변에 약간의 오디오를 남겨두세요.",
+		"reset": "초기화",
+		"apply": "적용",
+		"running": "감지 중…",
+		"appliedSummary": "트림 구간 {{count}}개 추가됨 (무음 {{seconds}}초)",
+		"noneFound": "현재 설정으로는 무음이 감지되지 않았습니다",
+		"failed": "오디오를 분석할 수 없습니다. 다른 녹화나 설정을 시도해 보세요."
+	},
+	"audio": {
+		"title": "오디오",
+		"enhanceVoice": "음성 향상",
+		"enhanceDescription": "내보낼 때 노이즈 제거 + 라우드니스 정규화",
+		"noiseReduction": "노이즈 감소",
+		"denoise": {
+			"off": "끔",
+			"light": "약하게",
+			"strong": "강하게"
+		},
+		"loudnessTarget": "라우드니스 목표",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "팟캐스트",
+			"soft": "부드럽게"
+		},
+		"preview": {
+			"title": "미리듣기",
+			"tenSeconds": "10초",
+			"original": "원본",
+			"enhanced": "향상됨",
+			"tip": "두 버튼을 클릭하여 A/B 비교",
+			"renderFailed": "미리듣기 생성 실패",
+			"playbackFailed": "재생 실패"
+		}
+	},
 	"layout": {
 		"title": "레이아웃",
 		"preset": "프리셋",

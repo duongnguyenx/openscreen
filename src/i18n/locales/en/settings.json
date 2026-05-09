@@ -28,6 +28,83 @@
 	"trim": {
 		"deleteRegion": "Delete Trim Region"
 	},
+	"captions": {
+		"button": "Auto-captions",
+		"title": "Auto-captions",
+		"description": "Generate subtitles from voice audio. Runs offline; first use downloads ~40MB model (cached).",
+		"language": "Language",
+		"lang": {
+			"en": "English",
+			"multilingual": "Multilingual"
+		},
+		"style": "Caption style",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "Subtle"
+		},
+		"position": "Position",
+		"positions": {
+			"top": "Top",
+			"center": "Center",
+			"bottom": "Bottom"
+		},
+		"phase": {
+			"loadingModel": "Loading model…",
+			"decoding": "Decoding audio…",
+			"resampling": "Resampling…",
+			"transcribing": "Transcribing…",
+			"building": "Building captions…"
+		},
+		"firstLoadHint": "First run downloads ~40MB. Subsequent runs are instant.",
+		"generate": "Generate Captions",
+		"generating": "Generating…",
+		"appliedSummary": "Added {{count}} captions",
+		"noneFound": "No speech detected",
+		"failed": "Caption generation failed. Check the console for details."
+	},
+	"autoTrim": {
+		"button": "Auto-trim Silences",
+		"title": "Auto-trim Silences",
+		"description": "Detect quiet sections and add trim regions automatically. Existing trims are kept.",
+		"threshold": "Silence threshold",
+		"thresholdHint": "Lower = more aggressive. Voiceover-only recordings work well around −40 dB.",
+		"minDuration": "Min silence duration",
+		"padding": "Keep around silence",
+		"paddingHint": "Leave a bit of audio around each cut so words don't get clipped.",
+		"reset": "Reset",
+		"apply": "Apply",
+		"running": "Detecting…",
+		"appliedSummary": "Added {{count}} trim regions ({{seconds}}s of silence)",
+		"noneFound": "No silences detected with current settings",
+		"failed": "Couldn't analyze audio. Try a different recording or settings."
+	},
+	"audio": {
+		"title": "Audio",
+		"enhanceVoice": "Enhance voice",
+		"enhanceDescription": "Denoise + level loudness on export",
+		"noiseReduction": "Noise reduction",
+		"denoise": {
+			"off": "Off",
+			"light": "Light",
+			"strong": "Strong"
+		},
+		"loudnessTarget": "Loudness target",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "Podcast",
+			"soft": "Soft"
+		},
+		"preview": {
+			"title": "Preview",
+			"tenSeconds": "10s",
+			"original": "Original",
+			"enhanced": "Enhanced",
+			"tip": "Click both to A/B compare",
+			"renderFailed": "Couldn't render preview snippet",
+			"playbackFailed": "Couldn't play snippet"
+		}
+	},
 	"layout": {
 		"title": "Layout",
 		"preset": "Preset",

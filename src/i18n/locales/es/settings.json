@@ -28,6 +28,83 @@
 	"trim": {
 		"deleteRegion": "Eliminar región de recorte"
 	},
+	"captions": {
+		"button": "Subtítulos automáticos",
+		"title": "Subtítulos automáticos",
+		"description": "Genera subtítulos desde audio de voz. Totalmente offline; el primer uso descarga un modelo de ~40 MB (cacheado).",
+		"language": "Idioma",
+		"lang": {
+			"en": "Inglés",
+			"multilingual": "Multilingüe"
+		},
+		"style": "Estilo de subtítulo",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "Sutil"
+		},
+		"position": "Posición",
+		"positions": {
+			"top": "Arriba",
+			"center": "Centro",
+			"bottom": "Abajo"
+		},
+		"phase": {
+			"loadingModel": "Cargando modelo…",
+			"decoding": "Decodificando audio…",
+			"resampling": "Remuestreando…",
+			"transcribing": "Transcribiendo…",
+			"building": "Generando subtítulos…"
+		},
+		"firstLoadHint": "La primera ejecución descarga ~40 MB. Las siguientes son instantáneas.",
+		"generate": "Generar subtítulos",
+		"generating": "Generando…",
+		"appliedSummary": "Se añadieron {{count}} subtítulos",
+		"noneFound": "No se detectó voz",
+		"failed": "La generación falló. Consulta la consola para detalles."
+	},
+	"autoTrim": {
+		"button": "Recortar silencios",
+		"title": "Recortar silencios automáticamente",
+		"description": "Detecta secciones silenciosas y añade regiones de recorte automáticamente. Los recortes existentes se conservan.",
+		"threshold": "Umbral de silencio",
+		"thresholdHint": "Más bajo = más agresivo. Para grabaciones con voz en off, prueba alrededor de −40 dB.",
+		"minDuration": "Duración mínima de silencio",
+		"padding": "Margen alrededor del silencio",
+		"paddingHint": "Deja un poco de audio alrededor de cada corte para no truncar palabras.",
+		"reset": "Restablecer",
+		"apply": "Aplicar",
+		"running": "Detectando…",
+		"appliedSummary": "Se añadieron {{count}} regiones de recorte ({{seconds}} s de silencio)",
+		"noneFound": "No se detectaron silencios con la configuración actual",
+		"failed": "No se pudo analizar el audio. Prueba otra grabación o configuración."
+	},
+	"audio": {
+		"title": "Audio",
+		"enhanceVoice": "Mejorar voz",
+		"enhanceDescription": "Reducir ruido + normalizar volumen al exportar",
+		"noiseReduction": "Reducción de ruido",
+		"denoise": {
+			"off": "Desactivado",
+			"light": "Suave",
+			"strong": "Fuerte"
+		},
+		"loudnessTarget": "Volumen objetivo",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "Podcast",
+			"soft": "Suave"
+		},
+		"preview": {
+			"title": "Vista previa",
+			"tenSeconds": "10s",
+			"original": "Original",
+			"enhanced": "Mejorado",
+			"tip": "Haz clic en ambos para comparar A/B",
+			"renderFailed": "No se pudo renderizar la vista previa",
+			"playbackFailed": "No se pudo reproducir el fragmento"
+		}
+	},
 	"layout": {
 		"title": "Diseño",
 		"preset": "Predefinido",

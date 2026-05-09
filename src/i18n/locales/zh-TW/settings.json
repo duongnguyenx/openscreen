@@ -35,6 +35,83 @@
 	"trim": {
 		"deleteRegion": "刪除剪輯區域"
 	},
+	"captions": {
+		"button": "自動字幕",
+		"title": "自動字幕",
+		"description": "從語音音訊生成字幕。完全離線;首次使用會下載約 40MB 模型(已快取)。",
+		"language": "語言",
+		"lang": {
+			"en": "英語",
+			"multilingual": "多語言"
+		},
+		"style": "字幕樣式",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "簡潔"
+		},
+		"position": "位置",
+		"positions": {
+			"top": "頂部",
+			"center": "中間",
+			"bottom": "底部"
+		},
+		"phase": {
+			"loadingModel": "載入模型…",
+			"decoding": "解碼音訊…",
+			"resampling": "重新取樣…",
+			"transcribing": "轉錄中…",
+			"building": "生成字幕…"
+		},
+		"firstLoadHint": "首次執行將下載約 40MB,後續即時載入。",
+		"generate": "生成字幕",
+		"generating": "生成中…",
+		"appliedSummary": "已加入 {{count}} 條字幕",
+		"noneFound": "未偵測到語音",
+		"failed": "字幕生成失敗。請查看主控台了解詳情。"
+	},
+	"autoTrim": {
+		"button": "自動修剪靜音",
+		"title": "自動修剪靜音",
+		"description": "自動偵測安靜片段並加入剪輯區域。現有剪輯會被保留。",
+		"threshold": "靜音閾值",
+		"thresholdHint": "數值越低越積極。僅旁白錄製建議 −40 dB 左右。",
+		"minDuration": "最短靜音時長",
+		"padding": "靜音前後保留",
+		"paddingHint": "每段剪輯前後保留一點音訊,避免單字被切掉。",
+		"reset": "重設",
+		"apply": "套用",
+		"running": "偵測中…",
+		"appliedSummary": "已加入 {{count}} 個剪輯區域(共 {{seconds}} 秒靜音)",
+		"noneFound": "目前設定下未偵測到靜音",
+		"failed": "無法分析音訊。請嘗試其他錄製或設定。"
+	},
+	"audio": {
+		"title": "音訊",
+		"enhanceVoice": "增強人聲",
+		"enhanceDescription": "匯出時降噪 + 響度標準化",
+		"noiseReduction": "降噪",
+		"denoise": {
+			"off": "關",
+			"light": "輕度",
+			"strong": "強"
+		},
+		"loudnessTarget": "響度目標",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "Podcast",
+			"soft": "柔和"
+		},
+		"preview": {
+			"title": "預聽",
+			"tenSeconds": "10秒",
+			"original": "原始",
+			"enhanced": "增強後",
+			"tip": "點擊兩個按鈕進行 A/B 對比",
+			"renderFailed": "無法生成預聽片段",
+			"playbackFailed": "無法播放片段"
+		}
+	},
 	"layout": {
 		"title": "版面配置",
 		"preset": "預設",

@@ -28,6 +28,83 @@
 	"trim": {
 		"deleteRegion": "Kırpma Bölgesini Sil"
 	},
+	"captions": {
+		"button": "Otomatik altyazı",
+		"title": "Otomatik altyazı",
+		"description": "Ses kaydından altyazı oluşturur. Tamamen çevrimdışı; ilk kullanımda ~40MB model indirilir (önbelleğe alınır).",
+		"language": "Dil",
+		"lang": {
+			"en": "İngilizce",
+			"multilingual": "Çok dilli"
+		},
+		"style": "Altyazı stili",
+		"styles": {
+			"tiktok": "TikTok",
+			"youtube": "YouTube",
+			"subtle": "Sade"
+		},
+		"position": "Konum",
+		"positions": {
+			"top": "Üst",
+			"center": "Orta",
+			"bottom": "Alt"
+		},
+		"phase": {
+			"loadingModel": "Model yükleniyor…",
+			"decoding": "Ses çözülüyor…",
+			"resampling": "Örnekleniyor…",
+			"transcribing": "Yazıya dökülüyor…",
+			"building": "Altyazılar oluşturuluyor…"
+		},
+		"firstLoadHint": "İlk çalıştırmada ~40MB indirilir. Sonrakiler anlıktır.",
+		"generate": "Altyazı Oluştur",
+		"generating": "Oluşturuluyor…",
+		"appliedSummary": "{{count}} altyazı eklendi",
+		"noneFound": "Konuşma tespit edilmedi",
+		"failed": "Altyazı oluşturma başarısız. Detaylar için konsola bakın."
+	},
+	"autoTrim": {
+		"button": "Sessizlikleri Otomatik Kırp",
+		"title": "Sessizlikleri Otomatik Kırp",
+		"description": "Sessiz bölümleri tespit eder ve otomatik olarak kırpma bölgesi ekler. Mevcut kırpmalar korunur.",
+		"threshold": "Sessizlik eşiği",
+		"thresholdHint": "Daha düşük = daha agresif. Voiceover kayıtlarda −40 dB civarı iyi çalışır.",
+		"minDuration": "Minimum sessizlik süresi",
+		"padding": "Sessizlik etrafında bırakılacak süre",
+		"paddingHint": "Kelimelerin kesilmemesi için her kırpmanın etrafında bir miktar ses bırakın.",
+		"reset": "Sıfırla",
+		"apply": "Uygula",
+		"running": "Algılanıyor…",
+		"appliedSummary": "{{count}} kırpma bölgesi eklendi ({{seconds}} s sessizlik)",
+		"noneFound": "Mevcut ayarlarla sessizlik tespit edilmedi",
+		"failed": "Ses analiz edilemedi. Farklı bir kayıt veya ayar deneyin."
+	},
+	"audio": {
+		"title": "Ses",
+		"enhanceVoice": "Sesi iyileştir",
+		"enhanceDescription": "Dışa aktarımda gürültü azaltma + ses seviyesi eşitleme",
+		"noiseReduction": "Gürültü azaltma",
+		"denoise": {
+			"off": "Kapalı",
+			"light": "Hafif",
+			"strong": "Güçlü"
+		},
+		"loudnessTarget": "Hedef ses seviyesi",
+		"loudness": {
+			"youtube": "YouTube",
+			"podcast": "Podcast",
+			"soft": "Yumuşak"
+		},
+		"preview": {
+			"title": "Önizleme",
+			"tenSeconds": "10s",
+			"original": "Orijinal",
+			"enhanced": "İyileştirilmiş",
+			"tip": "A/B karşılaştırması için ikisine de tıklayın",
+			"renderFailed": "Önizleme oluşturulamadı",
+			"playbackFailed": "Parça oynatılamadı"
+		}
+	},
 	"layout": {
 		"title": "Düzen",
 		"preset": "Ön Ayar",
@@ -184,16 +261,5 @@
 	},
 	"language": {
 		"title": "Dil"
-	},
-	"audio": {
-		"title": "Ses",
-		"noiseReduction": "Gürültü Azaltma",
-		"level": "Seviye",
-		"nrLevel": {
-			"light": "Hafif",
-			"moderate": "Orta",
-			"aggressive": "Güçlü"
-		},
-		"nrDescription": "Yapay zeka destekli gürültü azaltma arka plan gürültüsünü temizler. Daha yüksek seviyeler daha agresiftir ancak ses kalitesini etkileyebilir."
 	}
 }

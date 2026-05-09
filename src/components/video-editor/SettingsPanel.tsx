@@ -6,16 +6,21 @@ import {
 	FileDown,
 	Film,
 	Image,
+	Loader2,
 	Lock,
+	Mic2,
 	Palette,
+	Play,
 	Sparkles,
+	Square,
 	Star,
 	Trash2,
 	Unlock,
 	Upload,
+	Volume2,
 	X,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	Accordion,
@@ -36,8 +41,15 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useScopedT } from "@/contexts/I18nContext";
+import { renderAudioSnippet } from "@/lib/audioPreview";
 import { WEBCAM_LAYOUT_PRESETS } from "@/lib/compositeLayout";
-import type { ExportFormat, ExportQuality, GifFrameRate, GifSizePreset } from "@/lib/exporter";
+import type {
+	AudioEnhanceConfig,
+	ExportFormat,
+	ExportQuality,
+	GifFrameRate,
+	GifSizePreset,
+} from "@/lib/exporter";
 import { GIF_FRAME_RATES, GIF_SIZE_PRESETS } from "@/lib/exporter";
 import { cn } from "@/lib/utils";
 import { resolveImageWallpaperUrl, WALLPAPER_PATHS } from "@/lib/wallpaper";
@@ -128,6 +140,136 @@ function CustomSpeedInput({
 				className="w-12 bg-white/5 border border-white/10 rounded-md px-1 py-0.5 text-[11px] font-semibold text-[#d97706] text-center focus:outline-none focus:border-[#d97706]/40"
 			/>
 			<span className="text-[11px] font-semibold text-slate-500">×</span>
+		</div>
+	);
+}
+
+type PreviewMode = "original" | "enhanced";
+
+function AudioPreviewControls({
+	audioUrl,
+	currentTimeMs,
+	enhanceConfig,
+}: {
+	audioUrl: string;
+	currentTimeMs: number;
+	enhanceConfig: AudioEnhanceConfig;
+}) {
+	const t = useScopedT("settings");
+	const [loadingMode, setLoadingMode] = useState<PreviewMode | null>(null);
+	const [playingMode, setPlayingMode] = useState<PreviewMode | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const audioRef = useRef<HTMLAudioElement | null>(null);
+	const revokeRef = useRef<(() => void) | null>(null);
+
+	useEffect(() => {
+		// Cleanup on unmount
+		return () => {
+			audioRef.current?.pause();
+			audioRef.current = null;
+			revokeRef.current?.();
+			revokeRef.current = null;
+		};
+	}, []);
+
+	const stop = useCallback(() => {
+		audioRef.current?.pause();
+		audioRef.current = null;
+		revokeRef.current?.();
+		revokeRef.current = null;
+		setPlayingMode(null);
+	}, []);
+
+	const playSnippet = useCallback(
+		async (mode: PreviewMode) => {
+			// Stop any in-flight playback first
+			stop();
+			setError(null);
+			setLoadingMode(mode);
+			try {
+				const result = await renderAudioSnippet({
+					audioUrl,
+					startMs: currentTimeMs,
+					enhance: mode === "enhanced" ? enhanceConfig : undefined,
+				});
+
+				const audio = new Audio(result.url);
+				audio.addEventListener("ended", () => {
+					revokeRef.current?.();
+					revokeRef.current = null;
+					setPlayingMode(null);
+				});
+				audio.addEventListener("error", () => {
+					revokeRef.current?.();
+					revokeRef.current = null;
+					setPlayingMode(null);
+					setError(t("audio.preview.playbackFailed"));
+				});
+
+				audioRef.current = audio;
+				revokeRef.current = result.revoke;
+				setPlayingMode(mode);
+				await audio.play();
+			} catch (err) {
+				console.error("[AudioPreview] Render failed:", err);
+				setError(t("audio.preview.renderFailed"));
+				setPlayingMode(null);
+			} finally {
+				setLoadingMode(null);
+			}
+		},
+		[audioUrl, currentTimeMs, enhanceConfig, stop, t],
+	);
+
+	const isPlaying = playingMode !== null;
+	const renderButton = (mode: PreviewMode, label: string) => {
+		const isLoading = loadingMode === mode;
+		const isThisPlaying = playingMode === mode;
+		const isOtherBusy = loadingMode !== null && loadingMode !== mode;
+		return (
+			<Button
+				key={mode}
+				type="button"
+				variant="outline"
+				size="sm"
+				onClick={() => (isThisPlaying ? stop() : playSnippet(mode))}
+				disabled={isOtherBusy}
+				className={cn(
+					"h-7 flex-1 gap-1.5 text-[10px] transition-all",
+					isThisPlaying
+						? "bg-[#34B27B]/20 border-[#34B27B] text-[#34B27B]"
+						: "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300",
+				)}
+			>
+				{isLoading ? (
+					<Loader2 className="w-3 h-3 animate-spin" />
+				) : isThisPlaying ? (
+					<Square className="w-3 h-3" />
+				) : (
+					<Play className="w-3 h-3" />
+				)}
+				<span className="font-medium">{label}</span>
+			</Button>
+		);
+	};
+
+	return (
+		<div className="p-2 rounded-lg bg-white/5 border border-white/5 mt-2">
+			<div className="flex items-center justify-between mb-1.5">
+				<div className="flex items-center gap-1.5">
+					<Volume2 className="w-3 h-3 text-slate-400" />
+					<span className="text-[10px] font-medium text-slate-300">{t("audio.preview.title")}</span>
+				</div>
+				<span className="text-[9px] text-slate-500">{t("audio.preview.tenSeconds")}</span>
+			</div>
+			<div className="flex gap-1.5">
+				{renderButton("original", t("audio.preview.original"))}
+				{renderButton("enhanced", t("audio.preview.enhanced"))}
+			</div>
+			{error && <p className="text-[9px] text-red-400 mt-1.5">{error}</p>}
+			{!error && isPlaying && (
+				<p className="text-[9px] text-slate-500 mt-1.5">{t("audio.preview.tip")}</p>
+			)}
 		</div>
 	);
 }
@@ -233,6 +375,10 @@ interface SettingsPanelProps {
 	selectedSpeedValue?: PlaybackSpeed | null;
 	onSpeedChange?: (speed: PlaybackSpeed) => void;
 	onSpeedDelete?: (id: string) => void;
+	audioEnhance?: AudioEnhanceConfig;
+	onAudioEnhanceChange?: (next: AudioEnhanceConfig) => void;
+	audioPreviewUrl?: string | null;
+	audioPreviewCurrentTimeMs?: number;
 	hasWebcam?: boolean;
 	webcamLayoutPreset?: WebcamLayoutPreset;
 	onWebcamLayoutPresetChange?: (preset: WebcamLayoutPreset) => void;
@@ -321,6 +467,10 @@ export function SettingsPanel({
 	selectedSpeedValue,
 	onSpeedChange,
 	onSpeedDelete,
+	audioEnhance,
+	onAudioEnhanceChange,
+	audioPreviewUrl,
+	audioPreviewCurrentTimeMs,
 	hasWebcam = false,
 	webcamLayoutPreset = "picture-in-picture",
 	onWebcamLayoutPresetChange,
@@ -1254,6 +1404,111 @@ export function SettingsPanel({
 							</Button>
 						</AccordionContent>
 					</AccordionItem>
+
+					{audioEnhance && onAudioEnhanceChange && (
+						<AccordionItem value="audio" className="border-white/5 rounded-xl bg-white/[0.02] px-3">
+							<AccordionTrigger className="py-2.5 hover:no-underline">
+								<div className="flex items-center gap-2">
+									<Mic2 className="w-4 h-4 text-[#34B27B]" />
+									<span className="text-xs font-medium">{t("audio.title")}</span>
+								</div>
+							</AccordionTrigger>
+							<AccordionContent className="pb-3">
+								<div className="p-2 rounded-lg bg-white/5 border border-white/5">
+									<div className="flex items-center justify-between">
+										<div className="flex flex-col gap-0.5">
+											<span className="text-[11px] font-medium text-slate-200">
+												{t("audio.enhanceVoice")}
+											</span>
+											<span className="text-[9px] text-slate-500 leading-tight">
+												{t("audio.enhanceDescription")}
+											</span>
+										</div>
+										<Switch
+											checked={audioEnhance.enabled}
+											onCheckedChange={(checked) =>
+												onAudioEnhanceChange({ ...audioEnhance, enabled: checked })
+											}
+											className="data-[state=checked]:bg-[#34B27B] scale-90"
+										/>
+									</div>
+								</div>
+
+								{audioEnhance.enabled && (
+									<>
+										<div className="p-2 rounded-lg bg-white/5 border border-white/5 mt-2">
+											<div className="text-[10px] font-medium text-slate-300 mb-1.5">
+												{t("audio.noiseReduction")}
+											</div>
+											<div className="grid grid-cols-3 gap-1.5">
+												{(["off", "light", "strong"] as const).map((level) => {
+													const isActive = audioEnhance.denoise === level;
+													return (
+														<Button
+															key={level}
+															type="button"
+															onClick={() =>
+																onAudioEnhanceChange({ ...audioEnhance, denoise: level })
+															}
+															className={cn(
+																"h-auto w-full rounded-lg border px-1 py-1.5 text-center transition-all",
+																"duration-200 ease-out cursor-pointer",
+																isActive
+																	? "border-[#34B27B] bg-[#34B27B] text-white"
+																	: "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200",
+															)}
+														>
+															<span className="text-[10px] font-semibold capitalize">
+																{t(`audio.denoise.${level}`)}
+															</span>
+														</Button>
+													);
+												})}
+											</div>
+										</div>
+
+										<div className="p-2 rounded-lg bg-white/5 border border-white/5 mt-2">
+											<div className="text-[10px] font-medium text-slate-300 mb-1.5">
+												{t("audio.loudnessTarget")}
+											</div>
+											<Select
+												value={String(audioEnhance.loudnessTargetLufs)}
+												onValueChange={(value) =>
+													onAudioEnhanceChange({
+														...audioEnhance,
+														loudnessTargetLufs: Number(value),
+													})
+												}
+											>
+												<SelectTrigger className="h-8 bg-black/20 border-white/10 text-xs">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="-14" className="text-xs">
+														{t("audio.loudness.youtube")} (−14 LUFS)
+													</SelectItem>
+													<SelectItem value="-16" className="text-xs">
+														{t("audio.loudness.podcast")} (−16 LUFS)
+													</SelectItem>
+													<SelectItem value="-19" className="text-xs">
+														{t("audio.loudness.soft")} (−19 LUFS)
+													</SelectItem>
+												</SelectContent>
+											</Select>
+										</div>
+
+										{audioPreviewUrl && (
+											<AudioPreviewControls
+												audioUrl={audioPreviewUrl}
+												currentTimeMs={audioPreviewCurrentTimeMs ?? 0}
+												enhanceConfig={audioEnhance}
+											/>
+										)}
+									</>
+								)}
+							</AccordionContent>
+						</AccordionItem>
+					)}
 
 					<AccordionItem
 						value="background"
