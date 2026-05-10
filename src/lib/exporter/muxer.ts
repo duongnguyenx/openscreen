@@ -38,9 +38,12 @@ export class VideoMuxer {
 			frameRate: this.config.frameRate,
 		});
 
-		// Create audio source if needed
+		// Create audio source if needed.
+		// AAC is used instead of Opus because Opus-in-MP4 isn't supported by
+		// Windows Media Player and several other Windows-native players —
+		// audio would silently drop. AAC plays everywhere.
 		if (this.hasAudio) {
-			this.audioSource = new EncodedAudioPacketSource("opus");
+			this.audioSource = new EncodedAudioPacketSource("aac");
 			this.output.addAudioTrack(this.audioSource);
 		}
 

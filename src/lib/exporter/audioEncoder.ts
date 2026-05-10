@@ -149,16 +149,20 @@ export class AudioProcessor {
 		const sampleRate = audioConfig.sampleRate || 48000;
 		const channels = audioConfig.numberOfChannels || 2;
 
-		const encodeConfig: AudioEncoderConfig = {
-			codec: "opus",
+		// `aac.format: "aac"` requests raw AAC frames (no ADTS framing) suitable
+		// for MP4 muxing. The property is in the WebCodecs spec but missing from
+		// some TS lib.dom defs, hence the cast.
+		const encodeConfig = {
+			codec: "mp4a.40.2", // AAC-LC — broadest player support inside MP4
 			sampleRate,
 			numberOfChannels: channels,
 			bitrate: AUDIO_BITRATE,
-		};
+			aac: { format: "aac" },
+		} as AudioEncoderConfig;
 
 		const encodeSupport = await AudioEncoder.isConfigSupported(encodeConfig);
 		if (!encodeSupport.supported) {
-			console.warn("[AudioProcessor] Opus encoding not supported, skipping audio");
+			console.warn("[AudioProcessor] AAC encoding not supported, skipping audio");
 			for (const frame of framesToEncode) frame.close();
 			return;
 		}
@@ -399,9 +403,9 @@ export class AudioProcessor {
 		return recordedBlob;
 	}
 
-	// Demuxes the rendered speed-adjusted blob and feeds encoded chunks into the MP4 muxer.
-	// When `audioEnhance.enabled`, the blob is fully decoded → enhanced → re-encoded
-	// instead of pass-through demux.
+	// The blob is always Opus-in-WebM (from MediaRecorder during the speed-aware
+	// playback). Since the output muxer is AAC, we always decode → re-encode
+	// rather than passing chunks through. The audio enhancer hooks in here too.
 	private async muxRenderedAudioBlob(
 		blob: Blob,
 		muxer: VideoMuxer,
@@ -409,59 +413,12 @@ export class AudioProcessor {
 	): Promise<void> {
 		if (this.cancelled) return;
 
-		if (audioEnhance?.enabled) {
-			await this.muxEnhancedRenderedAudio(blob, muxer, audioEnhance);
-			return;
-		}
-
-		const file = new File([blob], "speed-audio.webm", { type: blob.type || "audio/webm" });
-		const wasmUrl = new URL("./wasm/web-demuxer.wasm", window.location.href).href;
-		const demuxer = new WebDemuxer({ wasmFilePath: wasmUrl });
-
-		try {
-			await demuxer.load(file);
-			const audioConfig = await demuxer.getDecoderConfig("audio");
-			const reader = demuxer.read("audio").getReader();
-			let isFirstChunk = true;
-
-			try {
-				while (!this.cancelled) {
-					const { done, value: chunk } = await reader.read();
-					if (done || !chunk) break;
-					if (isFirstChunk) {
-						await muxer.addAudioChunk(chunk, { decoderConfig: audioConfig });
-						isFirstChunk = false;
-					} else {
-						await muxer.addAudioChunk(chunk);
-					}
-				}
-			} finally {
-				try {
-					await reader.cancel();
-				} catch {
-					/* reader already closed */
-				}
-			}
-		} finally {
-			try {
-				demuxer.destroy();
-			} catch {
-				/* ignore */
-			}
-		}
-	}
-
-	private async muxEnhancedRenderedAudio(
-		blob: Blob,
-		muxer: VideoMuxer,
-		audioEnhance: AudioEnhanceConfig,
-	): Promise<void> {
 		const ctx = new AudioContext();
 		try {
 			const arrayBuffer = await blob.arrayBuffer();
 			const buffer = await ctx.decodeAudioData(arrayBuffer);
-			const enhanced = await enhanceAudio(buffer, audioEnhance);
-			await this.encodeAudioBufferToMuxer(enhanced, muxer);
+			const finalBuffer = audioEnhance?.enabled ? await enhanceAudio(buffer, audioEnhance) : buffer;
+			await this.encodeAudioBufferToMuxer(finalBuffer, muxer);
 		} finally {
 			void ctx.close();
 		}
@@ -471,15 +428,16 @@ export class AudioProcessor {
 		const sampleRate = buffer.sampleRate;
 		const channels = buffer.numberOfChannels;
 
-		const encodeConfig: AudioEncoderConfig = {
-			codec: "opus",
+		const encodeConfig = {
+			codec: "mp4a.40.2", // AAC-LC inside MP4 — universal player compat
 			sampleRate,
 			numberOfChannels: channels,
 			bitrate: AUDIO_BITRATE,
-		};
+			aac: { format: "aac" },
+		} as AudioEncoderConfig;
 		const support = await AudioEncoder.isConfigSupported(encodeConfig);
 		if (!support.supported) {
-			console.warn("[AudioProcessor] Opus encoding not supported for enhanced audio");
+			console.warn("[AudioProcessor] AAC encoding not supported for enhanced audio");
 			return;
 		}
 
