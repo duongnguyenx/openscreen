@@ -197,8 +197,34 @@ export class AudioProcessor {
 			await muxer.addAudioChunk(chunk, meta);
 		}
 
+		// Diagnostic: dump first/last timestamps + counts so we can spot A/V
+		// drift if a user reports it.
+		const firstDecoded = framesToEncode[0];
+		const lastDecoded = framesToEncode[framesToEncode.length - 1];
+		const firstAdjustedMs = firstDecoded
+			? Math.max(
+					0,
+					firstDecoded.timestamp -
+						this.computeTrimOffset(firstDecoded.timestamp / 1000, sortedTrims) * 1000,
+				) / 1000
+			: 0;
+		const lastAdjustedMs = lastDecoded
+			? Math.max(
+					0,
+					lastDecoded.timestamp -
+						this.computeTrimOffset(lastDecoded.timestamp / 1000, sortedTrims) * 1000,
+				) /
+					1000 +
+				(lastDecoded.numberOfFrames / lastDecoded.sampleRate) * 1000
+			: 0;
+		const firstChunk = encodedChunks[0]?.chunk;
+		const lastChunk = encodedChunks[encodedChunks.length - 1]?.chunk;
 		console.log(
-			`[AudioProcessor] Processed ${decodedFrames.length} audio frames, encoded ${encodedChunks.length} chunks`,
+			`[AudioProcessor] trims=${sortedTrims.length} ` +
+				`decoded=${framesToEncode.length} encoded=${encodedChunks.length} ` +
+				`adjusted=[${firstAdjustedMs.toFixed(1)}ms..${lastAdjustedMs.toFixed(1)}ms] ` +
+				`audioOut=[${(firstChunk?.timestamp ?? 0) / 1000}ms..${(lastChunk?.timestamp ?? 0) / 1000 + (lastChunk?.duration ?? 0) / 1000}ms] ` +
+				`enhance=${audioEnhance?.enabled ? `${audioEnhance.denoise}/${audioEnhance.loudnessTargetLufs}LUFS` : "off"}`,
 		);
 	}
 

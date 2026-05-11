@@ -343,6 +343,15 @@ export class VideoExporter {
 
 			await Promise.all(this.muxingPromises);
 
+			const actualVideoSec = frameIndex / this.config.frameRate;
+			const expectedVideoSec = totalFrames / this.config.frameRate;
+			console.log(
+				`[VideoExporter] video done: actual=${frameIndex} expected=${totalFrames} ` +
+					`@ ${this.config.frameRate}fps = ${actualVideoSec.toFixed(3)}s ` +
+					`(expected ${expectedVideoSec.toFixed(3)}s, source ${videoInfo.duration.toFixed(3)}s, ` +
+					`trims=${this.config.trimRegions?.length ?? 0})`,
+			);
+
 			this.reportProgress({
 				currentFrame: totalFrames,
 				totalFrames,
