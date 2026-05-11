@@ -132,6 +132,16 @@ export class AudioProcessor {
 			return;
 		}
 
+		// Diagnostic: log decoded frame shape so we can spot codec/format surprises.
+		const firstFrame = decodedFrames[0];
+		const lastFrame = decodedFrames[decodedFrames.length - 1];
+		const decodedTotalSamples = decodedFrames.reduce((s, f) => s + f.numberOfFrames, 0);
+		console.log(
+			`[AudioProcessor] decoded: ${decodedFrames.length} frames, ${decodedTotalSamples} samples; ` +
+				`first(t=${firstFrame.timestamp}us,n=${firstFrame.numberOfFrames},ch=${firstFrame.numberOfChannels},sr=${firstFrame.sampleRate}), ` +
+				`last(t=${lastFrame.timestamp}us,n=${lastFrame.numberOfFrames},ch=${lastFrame.numberOfChannels},sr=${lastFrame.sampleRate})`,
+		);
+
 		// Phase 1.5 (optional): run the decoded frames through the audio enhancer
 		// (denoise + loudness normalization) before re-encoding.
 		const framesToEncode = await this.applyEnhancement(decodedFrames, audioEnhance);
@@ -523,12 +533,65 @@ export class AudioProcessor {
 	): Promise<AudioData[]> {
 		if (!audioEnhance?.enabled || frames.length === 0) return frames;
 
+		// Capture expected sample counts up-front. We require the enhanced
+		// pipeline to preserve EXACT total length and per-frame numberOfFrames,
+		// otherwise A/V will drift downstream.
+		const expectedTotal = frames.reduce((sum, f) => sum + f.numberOfFrames, 0);
+		const expectedPerFrame = frames.map((f) => f.numberOfFrames);
+
 		try {
 			const buffer = audioDataFramesToBuffer(frames);
 			if (!buffer) return frames;
 
+			console.log(
+				`[AudioProcessor] enhance start: frames=${frames.length} ` +
+					`expectedSamples=${expectedTotal} bufferLength=${buffer.length} ` +
+					`channels=${buffer.numberOfChannels} sr=${buffer.sampleRate}`,
+			);
+			if (buffer.length !== expectedTotal) {
+				console.warn(
+					`[AudioProcessor] enhance bailout: buffer length ${buffer.length} != expected ${expectedTotal}; using raw frames`,
+				);
+				return frames;
+			}
+
 			const enhanced = await enhanceAudio(buffer, audioEnhance);
+
+			console.log(
+				`[AudioProcessor] enhance done: outLength=${enhanced.length} ` +
+					`channels=${enhanced.numberOfChannels} sr=${enhanced.sampleRate}`,
+			);
+			if (enhanced.length !== expectedTotal) {
+				console.warn(
+					`[AudioProcessor] enhance bailout: enhanced length ${enhanced.length} != expected ${expectedTotal}; using raw frames`,
+				);
+				return frames;
+			}
+			if (enhanced.sampleRate !== buffer.sampleRate) {
+				console.warn(
+					`[AudioProcessor] enhance bailout: enhanced sampleRate ${enhanced.sampleRate} != expected ${buffer.sampleRate}; using raw frames`,
+				);
+				return frames;
+			}
+
 			const enhancedFrames = audioBufferToDataFrames(enhanced, frames);
+			const enhancedTotal = enhancedFrames.reduce((sum, f) => sum + f.numberOfFrames, 0);
+			if (enhancedTotal !== expectedTotal || enhancedFrames.length !== frames.length) {
+				console.warn(
+					`[AudioProcessor] enhance bailout: split produced ${enhancedFrames.length} frames / ${enhancedTotal} samples (expected ${frames.length} / ${expectedTotal}); using raw frames`,
+				);
+				for (const f of enhancedFrames) f.close();
+				return frames;
+			}
+			for (let i = 0; i < enhancedFrames.length; i++) {
+				if (enhancedFrames[i].numberOfFrames !== expectedPerFrame[i]) {
+					console.warn(
+						`[AudioProcessor] enhance bailout: frame ${i} numberOfFrames mismatch (${enhancedFrames[i].numberOfFrames} != ${expectedPerFrame[i]}); using raw frames`,
+					);
+					for (const f of enhancedFrames) f.close();
+					return frames;
+				}
+			}
 
 			// Replace original frames with enhanced ones; close originals to free GPU buffers.
 			for (const frame of frames) frame.close();
