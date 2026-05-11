@@ -77,9 +77,16 @@ import type {
 import {
 	DEFAULT_WEBCAM_SIZE_PRESET,
 	MAX_PLAYBACK_SPEED,
+	MIN_PLAYBACK_SPEED,
 	ROTATION_3D_PRESET_ORDER,
 	SPEED_OPTIONS,
 } from "./types";
+
+/** Display `1.25` not `1.25` → trim trailing zeros so `1.10` becomes `1.1`. */
+function formatSpeed(v: number): string {
+	const rounded = Math.round(v * 100) / 100;
+	return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/0+$/, "");
+}
 
 function CustomSpeedInput({
 	value,
@@ -91,37 +98,58 @@ function CustomSpeedInput({
 	onError: () => void;
 }) {
 	const isPreset = SPEED_OPTIONS.some((o) => o.speed === value);
-	const [draft, setDraft] = useState(isPreset ? "" : String(Math.round(value)));
+	const [draft, setDraft] = useState(isPreset ? "" : formatSpeed(value));
 	const [isFocused, setIsFocused] = useState(false);
 
 	const prevValue = useRef(value);
 	if (!isFocused && prevValue.current !== value) {
 		prevValue.current = value;
-		setDraft(isPreset ? "" : String(Math.round(value)));
+		setDraft(isPreset ? "" : formatSpeed(value));
 	}
 
 	const handleChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
-			const digits = e.target.value.replace(/\D/g, "");
-			if (digits === "") {
-				setDraft("");
+			// Accept digits + a single decimal separator (. or ,). Comma is
+			// normalised to dot so it parses correctly on Vietnamese / EU
+			// locales where keyboards put `,` on the decimal key.
+			let raw = e.target.value.replace(",", ".");
+			raw = raw.replace(/[^0-9.]/g, "");
+			// Drop any decimal points beyond the first.
+			const firstDot = raw.indexOf(".");
+			if (firstDot >= 0) {
+				raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, "");
+			}
+			// Cap to 2 decimal places (matches clampPlaybackSpeed precision).
+			if (firstDot >= 0 && raw.length - firstDot - 1 > 2) {
+				raw = raw.slice(0, firstDot + 3);
+			}
+
+			if (raw === "" || raw === ".") {
+				setDraft(raw);
 				return;
 			}
-			const num = Number(digits);
+
+			const num = Number.parseFloat(raw);
+			if (!Number.isFinite(num)) return;
 			if (num > MAX_PLAYBACK_SPEED) {
 				onError();
 				return;
 			}
-			setDraft(digits);
-			if (num >= 1) onChange(num);
+
+			setDraft(raw);
+			if (num >= MIN_PLAYBACK_SPEED) onChange(num);
 		},
 		[onChange, onError],
 	);
 
 	const handleBlur = useCallback(() => {
 		setIsFocused(false);
-		if (!draft || Number(draft) < 1) {
-			setDraft(isPreset ? "" : String(Math.round(value)));
+		const num = Number.parseFloat(draft);
+		if (!draft || !Number.isFinite(num) || num < MIN_PLAYBACK_SPEED) {
+			setDraft(isPreset ? "" : formatSpeed(value));
+		} else {
+			// Re-format on blur so trailing dots / extra zeros disappear.
+			setDraft(formatSpeed(num));
 		}
 	}, [draft, isPreset, value]);
 
@@ -129,8 +157,8 @@ function CustomSpeedInput({
 		<div className="flex items-center gap-1">
 			<input
 				type="text"
-				inputMode="numeric"
-				pattern="[0-9]*"
+				inputMode="decimal"
+				pattern="[0-9]*[.,]?[0-9]*"
 				placeholder="--"
 				value={draft}
 				onFocus={() => setIsFocused(true)}
